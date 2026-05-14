@@ -284,14 +284,43 @@ agent-admin@ubuntu-agent:~$ $AGENT_HOME/agent-app
   agent-admin@ubuntu-agent:~$ 
   ```
 
+---
+### 5. 시스템 관제 자동화 스크립트(monitor.sh) 구현
+monitor.sh 실행 결과
+```
+agent-admin@ubuntu-agent:~$ /home/agent-admin/agent-app/bin/monitor.sh
+ERROR: You need to be root to run this script
+[WARNING] Firewall is inactive or unreachable.
+====== SYSTEM MONITOR RESULT ======
+Checking process 'agent-app'... [OK] (PID: 5083)
+Checking port 15034... [OK]
+
+[RESOURCE MONITORING]
+CPU Usage : 0%
+MEM Usage : 3.75324%
+DISK Used : 1%
+
+[INFO] Log appended: /var/log/agent-app/monitor.log
+agent-admin@ubuntu-agent:~$ 
+```
+
+/var/log/agent-app/monitor.log 누적 기록 확인(최근 라인)
+```
+agent-admin@ubuntu-agent:~$ tail -n 5 /var/log/agent-app/monitor.log
+[2026-05-14 19:55:35] PID:5083 CPU:0% MEM:5.05729% DISK_USED:1%
+[2026-05-14 19:56:45] PID:5083 CPU:0% MEM:4.32365% DISK_USED:1%
+agent-admin@ubuntu-agent:~$ 
+```  
+
+
 ## 2. 필수 증거 자료 체크리스트
 - [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
 - [x] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
 - [x] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
 - [x] 디렉토리 구조 및 권한(ACL 포함) 확인 내역
 - [x] 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
-- [ ] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
-- [ ] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
+- [x] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
+- [x] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
 - [ ] crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
 
 ## 3. 실행 결과 (스크린샷)
@@ -321,3 +350,9 @@ agent-admin@ubuntu-agent:~$ $AGENT_HOME/agent-app
 
 ### 앱 LISTEN 상태 확인
 ![앱 LISTEN 상태 확인](./images/Listen.png)
+
+### monitor.sh 실행 결과
+![monitor.sh 실행 결과](./images/script.png)
+
+### monitor.log 내역
+![monitor.log 내역](./images/log.png)
