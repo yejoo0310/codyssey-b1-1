@@ -48,10 +48,51 @@ sudo systemctl restart ssh
   ```
 
 ---
+### 2. 방화벽 활성화 및 20022/tcp, 15034/tcp만 허용
+#### (1) 방화벽 설정
+기본 정책 설정: 모든 들어오는 신호는 일단 막고, 나가는 신호는 허용하는 기본 정책 설정
+```
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+```
+
+과제에서 요구한 필수 포트 허용
+```
+sudo ufw allow 20022/tcp
+sudo ufw allow 15034/tcp
+```
+
+방화벽 활성화: 설정한 규칙을 시스템에 실제로 적용한다.
+```
+sudo ufw enable
+```
+
+#### (2) 수행 내역
+**방화벽 설정 확인**
+- **확인 방법**: `sudo ufw status verbose` 명령어를 통해 방화벽 상태를 확인
+- **결과 데이터**
+  ```text
+  yejoo031053822@ubuntu-agent:~$ sudo ufw status verbose
+  Status: active
+  Logging: on (low)
+  Default: deny (incoming), allow (outgoing), deny (routed)
+  New profiles: skip
+
+  To                         Action      From
+  --                         ------      ----
+  20022/tcp                  ALLOW IN    Anywhere                  
+  15034/tcp                  ALLOW IN    Anywhere                  
+  20022/tcp (v6)             ALLOW IN    Anywhere (v6)             
+  15034/tcp (v6)             ALLOW IN    Anywhere (v6)             
+
+  yejoo031053822@ubuntu-agent:~$       
+  ```
+
+---
 
 ## 2. 필수 증거 자료 체크리스트
 - [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
-- [ ] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
+- [x] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
 - [ ] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
 - [ ] 디렉토리 구조 및 권한(ACL 포함) 확인 내역
 - [ ] 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
@@ -62,3 +103,6 @@ sudo systemctl restart ssh
 ## 3. 실행 결과 (스크린샷)
 ### 포트 및 Root 원격 접속 차단 결과
 ![포트 및 Root 원격 접속 차단 설정](./images/Port_PermitRootLogin.png)
+
+### 방확벽 설정
+![방화벽 설정 상태 확인](./images/UFW.png)
