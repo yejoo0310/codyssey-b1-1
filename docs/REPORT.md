@@ -87,14 +87,118 @@ sudo ufw enable
 
   yejoo031053822@ubuntu-agent:~$       
   ```
+---
+### 3. 계정/그룹 생성 및 디렉토리 구조 설정 및 권한 설정
+#### (1) 계정/그룹 생성 및 권한 설정
+
+**그룹 생성**
+```
+sudo groupadd agent-common
+sudo groupadd agent-core
+```
+
+**사용자 생성 및 그룹 배정**
+```
+sudo useradd -m -G agent-common,agent-core agent-admin
+sudo useradd -m -G agent-common,agent-core agent-dev
+sudo useradd -m -G agent-common agent-test
+```
+
+**디렉토리 구조 생성**
+```
+sudo mkdir -p /home/agent-admin/agent-app/upload_files
+sudo mkdir -p /home/agent-admin/agent-app/api_keys
+sudo mkdir -p /var/log/agent-app
+```
+
+**접근 권한**
+- `upload_files`
+```
+sudo chown agent-admin:agent-admin /home/agent-admin/agent-app/upload_files
+sudo chmod 770 /home/agent-admin/agent-app/upload_files
+sudo setfacl -m g:agent-common:rwx /home/agent-admin/agent-app/upload_files
+```
+- `api_keys`
+```
+sudo chown agent-admin:agent-admin /home/agent-admin/agent-app/api_keys
+sudo chmod 700 /home/agent-admin/agent-app/api_keys
+sudo setfacl -m g:agent-core:rwx /home/agent-admin/agent-app/api_keys
+```
+- `/var/log/agent-app`
+```
+sudo chown root:agent-core /var/log/agent-app
+sudo chmod 770 /var/log/agent-app
+```
+#### (2) 수행 내역
+**사용자 생성 및 그룹 배정**
+- **확인 방법**: `id` 명령어를 통해 사용자 생성 및 소속 그룹을 확인 / `
+- **결과 데이터**
+  ```text
+  yejoo031053822@ubuntu-agent:~$ id agent-admin
+  uid=1000(agent-admin) gid=1002(agent-admin) groups=1002(agent-admin),1000(agent-common),1001(agent-core)
+  yejoo031053822@ubuntu-agent:~$ id agent-dev
+  uid=1001(agent-dev) gid=1003(agent-dev) groups=1003(agent-dev),1000(agent-common),1001(agent-core)
+  yejoo031053822@ubuntu-agent:~$ id agent-test
+  uid=1002(agent-test) gid=1004(agent-test) groups=1004(agent-test),1000(agent-common)
+  yejoo031053822@ubuntu-agent:~$ 
+  ```
+ 
+**디렉토리 구조**
+- **확인 방법**: `tree` 명령어를 이용해 특정 디렉토리 하위 구조를 트리 형태로 출력해서 확인
+- **결과 데이터**
+  ```text
+  yejoo031053822@ubuntu-agent:~$ sudo tree /home/agent-admin/agent-app
+  /home/agent-admin/agent-app
+  ├── api_keys
+  └── upload_files
+
+  3 directories, 0 files
+  ```
+  ```text
+  yejoo031053822@ubuntu-agent:~$ tree /var/log/agent-app
+  /var/log/agent-app
+
+  0 directories, 0 files
+  ```
+
+**권한 설정**
+- **확인 방법**: `getfacl` 명령어를 이용해 소유/권한 확인
+- **결과 데이터**
+  ```text
+  yejoo031053822@ubuntu-agent:~$ sudo getfacl /home/agent-admin/agent-app/upload_files
+  getfacl: Removing leading '/' from absolute path names
+  # file: home/agent-admin/agent-app/upload_files
+  # owner: agent-admin
+  # group: agent-admin
+  user::rwx
+  group::r-x
+  group:agent-common:rwx
+  mask::rwx
+  other::---
+
+  yejoo031053822@ubuntu-agent:~$ sudo getfacl /home/agent-admin/agent-app/api_keys
+  getfacl: Removing leading '/' from absolute path names
+  # file: home/agent-admin/agent-app/api_keys
+  # owner: agent-admin
+  # group: agent-admin
+  user::rwx
+  group::---
+  group:agent-core:rwx
+  mask::rwx
+  other::---
+
+  yejoo031053822@ubuntu-agent:~$ ls -ld /var/log/agent-app
+  drwxrwx--- 1 root agent-core 0 May 14 15:48 /var/log/agent-app
+  yejoo031053822@ubuntu-agent:~$ 
+  ```
 
 ---
 
 ## 2. 필수 증거 자료 체크리스트
 - [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
 - [x] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
-- [ ] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
-- [ ] 디렉토리 구조 및 권한(ACL 포함) 확인 내역
+- [x] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
+- [x] 디렉토리 구조 및 권한(ACL 포함) 확인 내역
 - [ ] 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
 - [ ] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - [ ] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
@@ -106,3 +210,12 @@ sudo ufw enable
 
 ### 방확벽 설정
 ![방화벽 설정 상태 확인](./images/UFW.png)
+
+### 사용자 생성 및 그룹 배정
+![사용자 계정 및 그룹 확인](./images/useradd.png)
+
+### 디렉토리 구조 확인
+![디렉토리 구조](./images/directory.png)
+
+### 권한 부여 확인
+![파일 권한 부여 확인](./images/ACL.png)
