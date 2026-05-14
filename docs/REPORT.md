@@ -311,7 +311,46 @@ agent-admin@ubuntu-agent:~$ tail -n 5 /var/log/agent-app/monitor.log
 [2026-05-14 19:56:45] PID:5083 CPU:0% MEM:4.32365% DISK_USED:1%
 agent-admin@ubuntu-agent:~$ 
 ```  
+---
+### 6. crontab 매분 실행 및 자동 실행 확인
+매분 실행 설정
+```
+agent-admin@ubuntu-agent:~$ crontab -l
+# Edit this file to introduce tasks to be run by cron.
+# 
+# Each task to run has to be defined through a single line
+# indicating with different fields when the task will be run
+# and what command to run for the task
+# 
+# To define the time you can provide concrete values for
+# minute (m), hour (h), day of month (dom), month (mon),
+# and day of week (dow) or use '*' in these fields (for 'any').
+# 
+# Notice that tasks will be started based on the cron's system
+# daemon's notion of time and timezones.
+# 
+# Output of the crontab jobs (including errors) is sent through
+# email to the user the crontab file belongs to (unless redirected).
+# 
+# For example, you can run a backup of all your user accounts
+# at 5 a.m every week with:
+# 0 5 * * 1 tar -zcf /var/backups/home.tgz /home/
+# 
+# For more information see the manual pages of crontab(5) and cron(8)
+# 
+# m h  dom mon dow   command
+* * * * * /home/agent-admin/agent-app/bin/monitor.sh
+agent-admin@ubuntu-agent:~$ 
+```
 
+실시간 로그 확인
+```
+agent-admin@ubuntu-agent:~$ tail -f /var/log/agent-app/monitor.log
+[2026-05-14 19:55:35] PID:5083 CPU:0% MEM:5.05729% DISK_USED:1%
+[2026-05-14 19:56:45] PID:5083 CPU:0% MEM:4.32365% DISK_USED:1%
+[2026-05-14 20:03:21] PID:5083 CPU:0% MEM:3.75324% DISK_USED:1%
+[2026-05-14 20:13:01] PID:5083 CPU:0% MEM:3.81879% DISK_USED:1%
+```
 
 ## 2. 필수 증거 자료 체크리스트
 - [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
@@ -321,7 +360,7 @@ agent-admin@ubuntu-agent:~$
 - [x] 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
 - [x] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - [x] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
-- [ ] crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
+- [x] crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
 
 ## 3. 실행 결과 (스크린샷)
 ### 포트 및 Root 원격 접속 차단 결과
@@ -356,3 +395,6 @@ agent-admin@ubuntu-agent:~$
 
 ### monitor.log 내역
 ![monitor.log 내역](./images/log.png)
+
+### crontab 설정 후 로그 확인
+![로그 확인](./images/crontab.png)
