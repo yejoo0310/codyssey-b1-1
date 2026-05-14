@@ -193,13 +193,103 @@ sudo chmod 770 /var/log/agent-app
   ```
 
 ---
+### 4. 애플리케이션 실행 환경 구성 
+#### (1) 애플리케이션 실행 환경 구성
+**환경 변수 설정**
+agent-admin 계정의 설정 파일(./bashrc)에 환경 변수를 기록
+```
+agent-admin@ubuntu-agent:~$ cat <<EOF >> ~/.bashrc
+export AGENT_HOME=/home/agent-admin/agent-app
+export AGENT_PORT=15034
+export AGENT_UPLOAD_DIR=\$AGENT_HOME/upload_files
+export AGENT_KEY_PATH=\$AGENT_HOME/api_keys/t_secret.key
+export AGENT_LOG_DIR=/var/log/agent-app
+EOF
+agent-admin@ubuntu-agent:~$ 
+```
+수정한 설정을 현재 터미널 세션에 즉시 적용
+```
+agent-admin@ubuntu-agent:~$ source ~/.bashrc
+```
+
+**키 파일 생성**
+```
+agent-admin@ubuntu-agent:~$ echo "agent_api_key_test" > $AGENT_KEY_PATH
+agent-admin@ubuntu-agent:~$ chmod 600 $AGENT_KEY_PATH
+```
+(보안을 위해 키 파일 자체의 권한을 본인만 읽을 수 있게 설정함)
+
+**agent-app 파일을 우분투 서버로 옮기기**
+```
+yejoo031053822@c4r8s8 ~ % scp -P 20022 ~/Downloads/agent-app agent-admin@192.168.139.51:/home/agent-admin/agent-app/
+agent-admin@192.168.139.51's password: 
+agent-app                                     100% 7741KB  51.4MB/s   00:00    
+yejoo031053822@c4r8s8 ~ % 
+```
+
+**agent-app 실행**
+```
+agent-admin@ubuntu-agent:~$ ls -l /home/agent-admin/agent-app
+total 7744
+-rw-r--r--  1 agent-admin agent-admin 7926296 May 14 18:28 agent-app
+drwxrwx---+ 1 agent-admin agent-admin      24 May 14 18:23 api_keys
+drwxrwx---+ 1 agent-admin agent-admin       0 May 14 15:48 upload_files
+agent-admin@ubuntu-agent:~$ chmod +x $AGENT_HOME/agent-app
+agent-admin@ubuntu-agent:~$ $AGENT_HOME/agent-app
+```
+
+#### (2) 수행 내역
+**환경 변수 설정 확인**
+  ```
+  agent-admin@ubuntu-agent:~$ env | grep AGENT
+  AGENT_UPLOAD_DIR=/home/agent-admin/agent-app/upload_files
+  AGENT_PORT=15034
+  AGENT_KEY_PATH=/home/agent-admin/agent-app/api_keys/t_secret.key
+  AGENT_HOME=/home/agent-admin/agent-app
+  AGENT_LOG_DIR=/var/log/agent-app
+  agent-admin@ubuntu-agent:~$ 
+  ```
+
+**키 파일 생성 확인**
+  ```
+  agent-admin@ubuntu-agent:~$ cat $AGENT_HOME/api_keys/t_secret.key
+  agent_api_key_test
+  agent-admin@ubuntu-agent:~$ 
+  ```
+
+**앱 실행 및 Boot Sequence 5단계 성공 확인**
+  ```
+  agent-admin@ubuntu-agent:~$ $AGENT_HOME/agent-app
+  >>> Starting Agent Boot Sequence...
+  [1/5] Checking User Account               [OK]
+   ... Running as service user 'agent-admin' (uid=1000)
+  [2/5] Verifying Environment Variables     [OK]
+   ... All required Envs correct
+  [3/5] Checking Required Files             [OK]
+   ... Verified 'secret.key' with correct key string.
+  [4/5] Checking Port Availability          [OK]
+   ... Port 15034 is available.
+  [5/5] Verifying Log Permission            [OK]
+   ... Log directory is writable: /var/log/agent-app
+  ------------------------------------------------------------
+  All Boot Checks Passed!
+  Agent READY
+  2026-05-14 18:36:23,468 [INFO] [SafetyGuard] Process priority lowered (nice=10).
+  ```
+
+**앱 LISTEN 상태 확인**
+  ```
+  agent-admin@ubuntu-agent:~$ netstat -an | grep 15034
+  tcp        0      0 0.0.0.0:15034           0.0.0.0:*               LISTEN     
+  agent-admin@ubuntu-agent:~$ 
+  ```
 
 ## 2. 필수 증거 자료 체크리스트
 - [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
 - [x] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
 - [x] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
 - [x] 디렉토리 구조 및 권한(ACL 포함) 확인 내역
-- [ ] 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
+- [x] 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
 - [ ] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - [ ] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
 - [ ] crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
@@ -219,3 +309,15 @@ sudo chmod 770 /var/log/agent-app
 
 ### 권한 부여 확인
 ![파일 권한 부여 확인](./images/ACL.png)
+
+### 환경 변수 설정 확인
+![환경 변수 확인](./images/environment.png)
+
+### api key 파일 생성 확인
+![api key 파일 확인](./images/api_key.png)
+
+### 애플리케이션 실행 Boot Sequence 확인 
+![Boot Sequence 확인](./images/Boot%20Sequence.png)
+
+### 앱 LISTEN 상태 확인
+![앱 LISTEN 상태 확인](./images/Listen.png)
