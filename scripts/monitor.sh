@@ -178,7 +178,6 @@ main() {
   print_warnings "${cpu_usage}" "${mem_usage}" "${disk_usage}"
 
   append_log "${pid}" "${cpu_usage}" "${mem_usage}" "${disk_usage}"
-  print_statistics_report
   print_log_appended
 }
 
