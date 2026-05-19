@@ -4,6 +4,7 @@
 - [0. OrbStack 환경 설정](#0-orbstack-환경-설정)
 - [1. SSH 설정](#1-ssh-설정-포트-변경-및-root-원격-로그인-차단)
 - [2. 방화벽 활성화](#2-방화벽-활성화)
+- [3. 계정/그룹/권한 체계(협업 + 최소 권한)](#3-계정그룹-생성)
 - [4. 애플리케이션 실행 환경 구성(제공 Python 앱)](#4-애플리케이션-실행-환경-구성)
 - [5. 시스템 관제 자동화 스크립트(monitor.sh) 구현](#5-시스템-관제-자동화-스크립트monitorsh-구현)
 - [6. 로그 파일 용량 관리](#6-logrotate-설정)
@@ -255,108 +256,232 @@ yejoo031053822@ubuntu:~$
 ---
 
 ## 3. 계정/그룹 생성
-#### (1) 계정/그룹 생성 및 권한 설정
+### 3.1 목적
+서버 운영 환경에서 역할별 권한을 분리하기 위해 `agent-admin`, `agent-dev`, `agent-test` 계정을 생성하였다. 
+또한 공유 작업 영역 접근을 위한 `agent-common` 그룹과 핵심 운영 리소스 접근을 위한 `agent-core` 그룹을 생성하였다.
 
-**그룹 생성**
-```
-sudo groupadd agent-common
-sudo groupadd agent-core
-```
+`agent-common`에는 운영, 개발, 테스트 계정을 모두 포함하고, `agent-core`에는 운영 및 개발 계정만 포함하였다.  
+이를 통해 테스트 계정은 공용 업로드 디렉토리에는 접근할 수 있지만, API 키나 운영 로그와 같은 핵심 리소스에는 접근하지 못하도록 구성할 수 있다.
 
-**사용자 생성 및 그룹 배정**
+### 3.2 그룹 생성
 ```
-sudo useradd -m -G agent-common,agent-core agent-admin
-sudo useradd -m -G agent-common,agent-core agent-dev
-sudo useradd -m -G agent-common agent-test
+yejoo031053822@ubuntu:~$ sudo groupadd agent-common
+yejoo031053822@ubuntu:~$ sudo groupadd agent-core
 ```
 
-**디렉토리 구조 생성**
+### 3.3 계정 생성
+계정 생성
 ```
-sudo mkdir -p /home/agent-admin/agent-app/upload_files
-sudo mkdir -p /home/agent-admin/agent-app/api_keys
-sudo mkdir -p /var/log/agent-app
+yejoo031053822@ubuntu:~$ sudo useradd -m agent-admin
+yejoo031053822@ubuntu:~$ sudo useradd -m agent-dev
+yejoo031053822@ubuntu:~$ sudo useradd -m agent-test
+```
+- `-m`: 홈 디렉토리 생성. 홈 디렉토리를 생성하면 계정별 설정 파일도 자연스럽게 저장할 수 있다.
+
+각 그룹에 계정 포함
+```
+yejoo031053822@ubuntu:~$ sudo usermod -aG agent-common agent-admin
+yejoo031053822@ubuntu:~$ sudo usermod -aG agent-commont agent-dev
+yejoo031053822@ubuntu:~$ sudo usermod -aG agent-common agent-dev
+yejoo031053822@ubuntu:~$ sudo usermod -aG agent-common agent-test
+yejoo031053822@ubuntu:~$ sudo usermod -aG agent-core agent-admin
+yejoo031053822@ubuntu:~$ sudo usermod -aG agent-core agent-dev
+```
+- `-a`: 기존 그룹을 유지하면서 추가. `useradd`로 사용자를 만들면 보통 사용자 이름과 같은 기본 그룹(primary group)이 자동으로 생성되기 때문. (리눅스에서는 User Private Group 방식으로, 사용자마다 자기 이름의 그룹을 하나씩 만들어서 기본적으로 개인 파일은 자기 계정과 자기 그룹에 속하게 한다. 이렇게 하면 다른 사용자와 권한이 섞이지 않고, 개인 홈 디렉토리 파일을 계정 단위로 분리하기 쉽다.)
+- `-G`: 보조 그룹 추가
+
+추가로 각 계정 비밀번호도 생성하였다. 각 계정으로 SSH 로그인을 할 수 있기 때문에 미리 생성하였다.
+```
+yejoo031053822@ubuntu:~$ sudo passwd agent-admin
+New password: 
+Retype new password: 
+passwd: password updated successfully
+yejoo031053822@ubuntu:~$ sudo passwd agent-dev
+New password: 
+Retype new password: 
+passwd: password updated successfully
+yejoo031053822@ubuntu:~$ sudo passwd agent-test
+New password: 
+Retype new password: 
+passwd: password updated successfully
+yejoo031053822@ubuntu:~$ 
 ```
 
-**접근 권한**
-- `upload_files`
+### 3.4 계정/그룹 생성 검증
 ```
-sudo chown agent-admin:agent-admin /home/agent-admin/agent-app/upload_files
-sudo chmod 770 /home/agent-admin/agent-app/upload_files
-sudo setfacl -m g:agent-common:rwx /home/agent-admin/agent-app/upload_files
+yejoo031053822@ubuntu:~$ id agent-admin
+uid=1000(agent-admin) gid=1002(agent-admin) groups=1002(agent-admin),1000(agent-common),1001(agent-core)
+yejoo031053822@ubuntu:~$ id agent-dev
+uid=1001(agent-dev) gid=1003(agent-dev) groups=1003(agent-dev),1000(agent-common),1001(agent-core)
+yejoo031053822@ubuntu:~$ id agent-test
+uid=1002(agent-test) gid=1004(agent-test) groups=1004(agent-test),1000(agent-common)
+yejoo031053822@ubuntu:~$ 
 ```
-- `api_keys`
-```
-sudo chown agent-admin:agent-admin /home/agent-admin/agent-app/api_keys
-sudo chmod 700 /home/agent-admin/agent-app/api_keys
-sudo setfacl -m g:agent-core:rwx /home/agent-admin/agent-app/api_keys
-```
-- `/var/log/agent-app`
-```
-sudo chown root:agent-core /var/log/agent-app
-sudo chmod 770 /var/log/agent-app
-```
-#### (2) 수행 내역
-**사용자 생성 및 그룹 배정**
-- **확인 방법**: `id` 명령어를 통해 사용자 생성 및 소속 그룹을 확인 / `
-- **결과 데이터**
-  ```text
-  yejoo031053822@ubuntu-agent:~$ id agent-admin
-  uid=1000(agent-admin) gid=1002(agent-admin) groups=1002(agent-admin),1000(agent-common),1001(agent-core)
-  yejoo031053822@ubuntu-agent:~$ id agent-dev
-  uid=1001(agent-dev) gid=1003(agent-dev) groups=1003(agent-dev),1000(agent-common),1001(agent-core)
-  yejoo031053822@ubuntu-agent:~$ id agent-test
-  uid=1002(agent-test) gid=1004(agent-test) groups=1004(agent-test),1000(agent-common)
-  yejoo031053822@ubuntu-agent:~$ 
-  ```
- 
-**디렉토리 구조**
-- **확인 방법**: `tree` 명령어를 이용해 특정 디렉토리 하위 구조를 트리 형태로 출력해서 확인
-- **결과 데이터**
-  ```text
-  yejoo031053822@ubuntu-agent:~$ sudo tree /home/agent-admin/agent-app
-  /home/agent-admin/agent-app
-  ├── api_keys
-  └── upload_files
+![계정/그룹 생성 검증](./images/user_id.png)
 
-  3 directories, 0 files
-  ```
-  ```text
-  yejoo031053822@ubuntu-agent:~$ tree /var/log/agent-app
-  /var/log/agent-app
+### 3.5 디렉토리 구조 설정
+```
+yejoo031053822@ubuntu:~$ sudo mkdir -p /home/agent-admin/agent-app/upload_files
+yejoo031053822@ubuntu:~$ sudo mkdir -p /home/agent-admin/agent-app/api_keys
+yejoo031053822@ubuntu:~$ sudo mkdir -p /home/agent-admin/agent-app/bin
+yejoo031053822@ubuntu:~$ sudo mkdir -p /var/log/agent-app
+```
 
-  0 directories, 0 files
-  ```
+### 3.6 디렉토리 구조 출력
+```
+yejoo031053822@ubuntu:~$ sudo tree -a /home/agent-admin/agent-app
+/home/agent-admin/agent-app
+├── api_keys
+├── bin
+└── upload_files
 
-**권한 설정**
-- **확인 방법**: `getfacl` 명령어를 이용해 소유/권한 확인
-- **결과 데이터**
-  ```text
-  yejoo031053822@ubuntu-agent:~$ sudo getfacl /home/agent-admin/agent-app/upload_files
-  getfacl: Removing leading '/' from absolute path names
-  # file: home/agent-admin/agent-app/upload_files
-  # owner: agent-admin
-  # group: agent-admin
-  user::rwx
-  group::r-x
-  group:agent-common:rwx
-  mask::rwx
-  other::---
+4 directories, 0 files
+yejoo031053822@ubuntu:~$
+```
+![디렉토리 구조](./images/tree.png)
 
-  yejoo031053822@ubuntu-agent:~$ sudo getfacl /home/agent-admin/agent-app/api_keys
-  getfacl: Removing leading '/' from absolute path names
-  # file: home/agent-admin/agent-app/api_keys
-  # owner: agent-admin
-  # group: agent-admin
-  user::rwx
-  group::---
-  group:agent-core:rwx
-  mask::rwx
-  other::---
+### 3.7 접근 권한 부여
+#### `home/agent-admin` 권한 설정
+```
+yejoo031053822@ubuntu:~$ sudo setfacl -m g:agent-common:--x /home/agent-admin
+```
+- `/home/agent-admin`은 `agent-admin`의 개인 홈 디렉토리이다. 따라서 소유자:그룹을 보통 `agent-admin:agent-admin`으로 유지한다.
+- `agent-common` 그룹의 계정도 `upload_files`까지는 접근해야 하므로, 상위 경로인 `home/agent-admin`에는 `agent-common` 그룹의 통과 권한만 부여한다.
+- `-m`: modify, 즉 ACL 규칙을 추가하거나 수정한다는 의미이다.
+- `g:agent-common:--x`: `agent-common` 그룹에게 실행 권한만 부여한다.
 
-  yejoo031053822@ubuntu-agent:~$ ls -ld /var/log/agent-app
-  drwxrwx--- 1 root agent-core 0 May 14 15:48 /var/log/agent-app
-  yejoo031053822@ubuntu-agent:~$ 
-  ```
+#### `home/agent-admin/agent-app` 권한 설정
+```
+yejoo031053822@ubuntu:~$ sudo chown agent-admin:agent-core /home/agent-admin/agent-app
+yejoo031053822@ubuntu:~$ sudo chmod 750 /home/agent-admin/agent-app
+yejoo031053822@ubuntu:~$ sudo setfacl -m g:agent-common:--x /home/agent-admin/agent-app
+```
+- `agent-app`은 애플리케이션 기준 디렉토리인데 여기에는 민감한 디렉토리도 있고, 공용 디렉토리도 있다. 그래서 기본적으로는 운영/개발 그룹인 `agent-core` 중심으로 접근하게 두고, `agent-test`는 `upload_files`까지 갈 수 있도록 통과 권한만 준다.
+- 소유자:그룹을 `agent-admin:agent-core`로 설정
+- `agent-test`도 `upload_files`까지 가야 하므로 ACL을 이용해서 `agent-common`에게 `agent-app` 통과 권한을 준다.
+- 이렇게 하면 `agent-test`는 `home/agent-admin/agent-app` 안의 `api_keys`나 `bin` 목록을 불필요하게 노출하지 않으면서, `upload_files`까지 들어갈 수 있다.
+
+#### `home/agent-admin/agent-app/upload_files` 권한 설정
+```
+yejoo031053822@ubuntu:~$ sudo chown agent-admin:agent-common /home/agent-admin/agent-app/upload_files
+yejoo031053822@ubuntu:~$ sudo chmod 2770 /home/agent-admin/agent-app/upload_files
+yejoo031053822@ubuntu:~$ sudo setfacl -m d:g:agent-common:rwx /home/agent-admin/agent-app/upload_files
+yejoo031053822@ubuntu:~$ sudo setfacl -m d:m:rwx /home/agent-admin/agent-app/upload_files
+```
+- 소유자:그룹을 `agent-admin:agent-common`으로 설정
+- `chmod 2770`에서 2는 setgid로 그 안에 새로 만들어지는 파일/디렉토리가 부모 디렉토리의 그룹을 상속받는다. 이를 통해 그 안에서 누가 파일을 만들든 그룹이 부모 디렉토리의 그룹으로 유지된다.
+- 이게 없으면 사용자가 파일을 만들 때 자기 기본 그룹으로 생성될 수 있는데 그러면 다른 계정과 공유가 꼬일 수 있다.
+- `d:`: default ACL로, 앞으로 이 디렉토리 안에 새로 만들어지는 파일/디렉토리에도 이 권한 규칙을 기본 적용한다.
+- `m:`: mask로, ACL에서 mask는 그룹/ACL 권한의 최대 허용치를 의미한다. mask가 좁게 잡히면 `agent-common:rwx`를 줬어도 실제 쓰기 권한이 제한될 수 있다.그래서 협업 디렉토리에서는 default mask를 rwx로 두는 것이 안전하다.
+
+#### `home/agent-admin/agent-app/api_keys` 권한 설정
+```
+yejoo031053822@ubuntu:~$ sudo chown agent-admin:agent-core /home/agent-admin/agent-app/api_keys
+yejoo031053822@ubuntu:~$ sudo chmod 2770 /home/agent-admin/agent-app/api_keys
+yejoo031053822@ubuntu:~$ sudo setfacl -m d:g:agent-core:rwx /home/agent-admin/agent-app/api_keys
+yejoo031053822@ubuntu:~$ sudo setfacl -m d:m:rwx /home/agent-admin/agent-app/api_keys
+```
+- 소유자:그룹을 `agent-admin:agent-core`로 설정
+- ACL로 앞으로 생성될 파일/디렉토리에도 `agent-core` 권한이 유지되게 한다.
+
+#### `/var/log/agent-app` 권한 설정
+```
+yejoo031053822@ubuntu:~$ sudo chown agent-admin:agent-core /var/log/agent-app
+yejoo031053822@ubuntu:~$ sudo chmod 2770 /var/log/agent-app
+yejoo031053822@ubuntu:~$ sudo setfacl -m d:g:agent-core:rwx /var/log/agent-app
+yejoo031053822@ubuntu:~$ sudo setfacl -m d:m:rwx /var/log/agent-app
+```
+- 소유자:그룹을 `agent-admin:agent-core`로 설정
+- ACL로 앞으로 생성될 로그 파일에도 `agent-core` 권한이 유지되게 한다.
+
+### 3.8 권한 점검
+```
+yejoo031053822@ubuntu:~$ sudo ls -ld /home/agent-admin/agent-app
+drwxr-x---+ 1 agent-admin agent-core 46 May 18 16:39 /home/agent-admin/agent-app
+yejoo031053822@ubuntu:~$ sudo ls -ld /home/agent-admin/agent-app/upload_files
+drwxrws---+ 1 agent-admin agent-common 0 May 18 16:39 /home/agent-admin/agent-app/upload_files
+yejoo031053822@ubuntu:~$ sudo ls -ld /home/agent-admin/agent-app/api_keys
+drwxrws---+ 1 agent-admin agent-core 0 May 18 16:39 /home/agent-admin/agent-app/api_keys
+yejoo031053822@ubuntu:~$ sudo ls -ld /var/log/agent-app
+drwxrws---+ 1 agent-admin agent-core 0 May 18 16:39 /var/log/agent-app
+yejoo031053822@ubuntu:~$
+```
+```
+yejoo031053822@ubuntu:~$ sudo getfacl /home/agent-admin
+getfacl: Removing leading '/' from absolute path names
+# file: home/agent-admin
+# owner: agent-admin
+# group: agent-admin
+user::rwx
+group::r-x
+group:agent-common:--x
+mask::r-x
+other::---
+
+yejoo031053822@ubuntu:~$ sudo getfacl /home/agent-admin/agent-app
+getfacl: Removing leading '/' from absolute path names
+# file: home/agent-admin/agent-app
+# owner: agent-admin
+# group: agent-core
+user::rwx
+group::r-x
+group:agent-common:--x
+mask::r-x
+other::---
+
+yejoo031053822@ubuntu:~$ sudo getfacl /home/agent-admin/agent-app/upload_files
+getfacl: Removing leading '/' from absolute path names
+# file: home/agent-admin/agent-app/upload_files
+# owner: agent-admin
+# group: agent-common
+# flags: -s-
+user::rwx
+group::rwx
+other::---
+default:user::rwx
+default:group::rwx
+default:group:agent-common:rwx
+default:mask::rwx
+default:other::---
+
+yejoo031053822@ubuntu:~$ sudo getfacl /home/agent-admin/agent-app/api_keys
+getfacl: Removing leading '/' from absolute path names
+# file: home/agent-admin/agent-app/api_keys
+# owner: agent-admin
+# group: agent-core
+# flags: -s-
+user::rwx
+group::rwx
+other::---
+default:user::rwx
+default:group::rwx
+default:group:agent-core:rwx
+default:mask::rwx
+default:other::---
+
+yejoo031053822@ubuntu:~$ sudo getfacl /var/log/agent-app
+getfacl: Removing leading '/' from absolute path names
+# file: var/log/agent-app
+# owner: agent-admin
+# group: agent-core
+# flags: -s-
+user::rwx
+group::rwx
+other::---
+default:user::rwx
+default:group::rwx
+default:group:agent-core:rwx
+default:mask::rwx
+default:other::---
+
+yejoo031053822@ubuntu:~$ 
+```
+![권한 확인](./images/acl_ls.png)
+![권한 확인](./images/acl_getfacl.png)
+
+### 3.9 권한 부여 정리
+역할 기반 접근 제어를 위해 기본 Unix 권한과 ACL을 함께 사용하였다. `/home/agent-admin`과 `/home/agent-admin/agent-app`에는 `agent-common` 그룹의 통과 권한만 부여하여 `agent-test`가 공용 업로드 디렉토리까지 접근할 수 있도록 하되, 상위 디렉토리 목록 조회는 제한하였다. `upload_files`는 `agent-common` 그룹이 읽기/쓰기 가능하도록 설정하고, `api_keys`와 `/var/log/agent-app`는 `agent-core` 그룹만 읽기/쓰기 가능하도록 설정하였다. 또한 협업 디렉토리에는 setgid와 default ACL을 적용하여 이후 생성되는 파일과 디렉토리도 의도한 그룹 권한을 유지하도록 구성하였다.
+
 
 ---
 ## 4. 애플리케이션 실행 환경 구성 
