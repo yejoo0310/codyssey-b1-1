@@ -8,6 +8,7 @@
 - [5. 시스템 관제 자동화 스크립트(monitor.sh) 구현](#5-시스템-관제-자동화-스크립트monitorsh-구현)
 - [6. 로그 파일 용량 관리](#6-logrotate-설정)
 - [7. 자동 실행(cron) 설정](#7-crontab-매분-실행-및-자동-실행-확인)
+- [8. 필수 증거 체크리스트](#8-필수-증거-자료-체크리스트)
 
 ## 0. OrbStack 환경 설정
 이번 실습에서는 컨테이너 대신 OrbStack을 이용해 Ubuntu Linux 가상머신을 띄워서 인프라 환경을 구축했다. 
@@ -674,7 +675,7 @@ agent-admin@ubuntu:~$ tail -f /var/log/agent-app/monitor.log
 ![cron tail -n 10](./images/cron_tail_n.png)
 ![cron tail -f](./images/cron_tail_f.png)
 
-## 2. 필수 증거 자료 체크리스트
+## 8. 필수 증거 자료 체크리스트
 - [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
 - [x] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
 - [x] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
@@ -683,40 +684,3 @@ agent-admin@ubuntu:~$ tail -f /var/log/agent-app/monitor.log
 - [x] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - [x] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
 - [x] crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
-
-## 3. 실행 결과 (스크린샷)
-### 포트 및 Root 원격 접속 차단 결과
-![포트 및 Root 원격 접속 차단 설정](./images/Port_PermitRootLogin.png)
-
-### 방확벽 설정
-![방화벽 설정 상태 확인](./images/UFW.png)
-
-### 사용자 생성 및 그룹 배정
-![사용자 계정 및 그룹 확인](./images/useradd.png)
-
-### 디렉토리 구조 확인
-![디렉토리 구조](./images/directory.png)
-
-### 권한 부여 확인
-![파일 권한 부여 확인](./images/ACL.png)
-
-### 환경 변수 설정 확인
-![환경 변수 확인](./images/environment.png)
-
-### api key 파일 생성 확인
-![api key 파일 확인](./images/api_key.png)
-
-### 애플리케이션 실행 Boot Sequence 확인 
-![Boot Sequence 확인](./images/Boot%20Sequence.png)
-
-### 앱 LISTEN 상태 확인
-![앱 LISTEN 상태 확인](./images/Listen.png)
-
-### monitor.sh 실행 결과
-![monitor.sh 실행 결과](./images/script.png)
-
-### monitor.log 내역
-![monitor.log 내역](./images/log.png)
-
-### crontab 설정 후 로그 확인
-![로그 확인](./images/crontab.png)
