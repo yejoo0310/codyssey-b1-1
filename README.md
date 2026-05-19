@@ -17,6 +17,7 @@
 | 1 | [요구사항 수행 내역서](docs/REPORT.md) | 문제별 수행 명령어 및 결과 정리 |
 | 2 | [시스템 관제 자동화 스크립트](scripts/monitor.sh) | Bash 기반 모니터링 스크립트 |
 | 3 | [트러블슈팅 문서](docs/TROUBLESHOOTING.md) | 문제 발생 원인 및 해결 과정 정리 |
+| 4 | [모니터링 스크립트 설명](docs/MONITORING_SCRIPT.md) | monitor.sh 스크립트 코드 설명 |
 
 ---
 
