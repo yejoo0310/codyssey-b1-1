@@ -1,76 +1,185 @@
-# 0. 환경 설정
-LOG_FILE="/var/log/agent-app/monitor.log"
-APP_NAME="agent-app"
-PORT=15034
-MAX_SIZE=10485760  # 10MB
-MAX_FILES=10
+#!/usr/bin/env bash
 
-# 1. Health Check (실패 시 종료)
-PID=$(pgrep -f "$APP_NAME" | head -n 1)
-if [ -z "$PID" ]; then
-    echo "[ERROR] Process $APP_NAME is not running."
+set -u
+
+readonly APP_PROCESS_NAME="agent-app"
+readonly APP_PROCESS_PATH="/home/agent-admin/agent-app/agent-app"
+readonly APP_PORT="15034"
+readonly LOG_FILE="/var/log/agent-app/monitor.log"
+readonly STATISTICS_SAMPLE_LIMIT="10"
+
+readonly CPU_THRESHOLD="20"
+readonly MEM_THRESHOLD="10"
+readonly DISK_THRESHOLD="80"
+
+print_title() {
+  echo "====== SYSTEM MONITOR RESULT ======"
+  echo
+}
+
+find_app_pid() {
+    pgrep -u agent-admin -fx "${APP_PROCESS_PATH}" | head -n 1
+}
+
+check_process() {
+  local pid="$1"
+
+  echo "[HEALTH CHECK]"
+
+  if [[ -z "${pid}" ]]; then
+    echo "Checking process '${APP_PROCESS_NAME}'... [FAIL]"
     exit 1
-fi
+  fi
 
-if ! ss -tuln | grep -q ":$PORT "; then
-    echo "[ERROR] Port $PORT is not listening."
-    exit 1
-fi
+  echo "Checking process '${APP_PROCESS_NAME}'... [OK] (PID: ${pid})"
+}
 
-# 2. 상태 점검 (경고만 출력)
-if ! command -v ufw > /dev/null || ! ufw status | grep -q "active"; then
-    echo "[WARNING] Firewall is inactive or unreachable."
-fi
+check_port() {
+  if ss -ltnH | awk '{print $4}' | grep -Eq ":${APP_PORT}$"; then
+    echo "Checking port ${APP_PORT}... [OK]"
+    echo
+    return
+  fi
 
-# 3. 자원 수집
-CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')
-MEM_USAGE=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
-DISK_USAGE=$(df / | grep / | tail -1 | awk '{print $5}' | sed 's/%//')
+  echo "Checking port ${APP_PORT}... [FAIL]"
+  exit 1
+}
 
-# 4. 결과 출력 및 임계값 경고
-echo "====== SYSTEM MONITOR RESULT ======"
-echo "Checking process '$APP_NAME'... [OK] (PID: $PID)"
-echo "Checking port $PORT... [OK]"
-echo ""
-echo "[RESOURCE MONITORING]"
-echo "CPU Usage : $CPU_USAGE%"
-echo "MEM Usage : $MEM_USAGE%"
-echo "DISK Used : $DISK_USAGE%"
+check_firewall() {
+  if command -v ufw >/dev/null 2>&1; then
+    if ufw status 2>/dev/null | grep -q "Status: active"; then
+      return
+    fi
 
-if (( $(echo "$CPU_USAGE > 20" | awk '{print ($1 > $2)}') )); then echo "[WARNING] CPU threshold exceeded ($CPU_USAGE% > 20%)"; fi
-if (( $(echo "$MEM_USAGE > 10" | awk '{print ($1 > $2)}') )); then echo "[WARNING] MEM threshold exceeded ($MEM_USAGE% > 10%)"; fi
-if [ "$DISK_USAGE" -gt 80 ]; then echo "[WARNING] DISK threshold exceeded ($DISK_USAGE% > 80%)"; fi
+    if grep -q "^ENABLED=yes" /etc/ufw/ufw.conf 2>/dev/null; then
+      return
+    fi
 
-# 5. 로그 기록
-TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-LOG_LINE="[$TIMESTAMP] PID:$PID CPU:$CPU_USAGE% MEM:$MEM_USAGE% DISK_USED:$DISK_USAGE%"
-echo "$LOG_LINE" >> "$LOG_FILE"
-echo ""
-echo "[INFO] Log appended: $LOG_FILE"
+    echo "[WARNING] Firewall is inactive"
+    echo
+    return
+  fi
 
-# 6. 로그 파일 용량 관리 (10MB 초과 시 10개 파일 유지)
-MAX_SIZE=10485760  # 10MB
-MAX_FILES=10
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    if firewall-cmd --state >/dev/null 2>&1; then
+      return
+    fi
 
-if [ -f "$LOG_FILE" ] && [ $(stat -c%s "$LOG_FILE") -gt $MAX_SIZE ]; then
-    echo "[INFO] Log size exceeded 10MB. Rotating logs..."
-    
-    # 1. 가장 오래된 10번 파일은 삭제해서 자리를 만듭니다.
-    rm -f "$LOG_FILE.$MAX_FILES"
-    
-    # 2. 파일들을 하나씩 뒤로 미룹니다 (9번은 10번으로, 1번은 2번으로...)
-    # 역순으로 옮겨야 파일이 덮어씌워지지 않고 도미노처럼 밀려납니다.
-    for i in $(seq $((MAX_FILES-1)) -1 1); do
-        if [ -f "$LOG_FILE.$i" ]; then
-            mv "$LOG_FILE.$i" "$LOG_FILE.$((i+1))"
-        fi
-    done
-    
-    # 3. 현재 로그를 1번으로 만들고, 새 로그 파일을 생성합니다.
-    mv "$LOG_FILE" "$LOG_FILE.1"
-    touch "$LOG_FILE"
-    
-    # 4. 권한 복구 (그룹이 계속 쓸 수 있게)
-    chmod 660 "$LOG_FILE"
-    chgrp agent-core "$LOG_FILE"
-fi
+    echo "[WARNING] Firewall is inactive"
+    echo
+    return
+  fi
+
+  echo "[WARNING] Firewall tool not found"
+  echo
+}
+
+collect_cpu_usage() {
+  LC_ALL=C top -bn1 | awk '
+    /^%?Cpu/ {
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^id,?$/) {
+          idle = $(i - 1)
+          gsub(",", "", idle)
+          printf "%.1f", 100 - idle
+          exit
+        }
+      }
+    }
+  '
+}
+
+collect_mem_usage() {
+  free | awk '/Mem:/ {
+    printf "%.1f", ($3 / $2) * 100
+  }'
+}
+
+collect_disk_usage() {
+  df -P / | awk 'NR==2 {
+    gsub("%", "", $5)
+    print $5
+  }'
+}
+
+print_resource_result() {
+  local cpu_usage="$1"
+  local mem_usage="$2"
+  local disk_usage="$3"
+
+  echo "[RESOURCE MONITORING]"
+  echo "CPU Usage : ${cpu_usage}%"
+  echo "MEM Usage : ${mem_usage}%"
+  echo "DISK Used  : ${disk_usage}%"
+  echo
+}
+
+print_warnings() {
+  local cpu_usage="$1"
+  local mem_usage="$2"
+  local disk_usage="$3"
+  local warning_printed="false"
+
+  if awk "BEGIN { exit !(${cpu_usage} > ${CPU_THRESHOLD}) }"; then
+    echo "[WARNING] CPU threshold exceeded (${cpu_usage}% > ${CPU_THRESHOLD}%)"
+    warning_printed="true"
+  fi
+
+  if awk "BEGIN { exit !(${mem_usage} > ${MEM_THRESHOLD}) }"; then
+    echo "[WARNING] MEM threshold exceeded (${mem_usage}% > ${MEM_THRESHOLD}%)"
+    warning_printed="true"
+  fi
+
+  if awk "BEGIN { exit !(${disk_usage} > ${DISK_THRESHOLD}) }"; then
+    echo "[WARNING] DISK threshold exceeded (${disk_usage}% > ${DISK_THRESHOLD}%)"
+    warning_printed="true"
+  fi
+
+  if [[ "${warning_printed}" == "true" ]]; then
+    echo
+  fi
+}
+
+append_log() {
+  local pid="$1"
+  local cpu_usage="$2"
+  local mem_usage="$3"
+  local disk_usage="$4"
+  local current_datetime
+
+  current_datetime="$(date '+%Y-%m-%d %H:%M:%S')"
+
+  echo "[${current_datetime}] PID:${pid} CPU:${cpu_usage}% MEM:${mem_usage}% DISK_USED:${disk_usage}%" >> "${LOG_FILE}"
+}
+
+print_log_appended() {
+  echo "[INFO] Log appended: ${LOG_FILE}"
+}
+
+main() {
+  local pid
+  local cpu_usage
+  local mem_usage
+  local disk_usage
+
+  print_title
+
+  pid="$(find_app_pid)"
+
+  check_process "${pid}"
+  check_port
+  check_firewall
+
+  cpu_usage="$(collect_cpu_usage)"
+  mem_usage="$(collect_mem_usage)"
+  disk_usage="$(collect_disk_usage)"
+
+  print_resource_result "${cpu_usage}" "${mem_usage}" "${disk_usage}"
+  print_warnings "${cpu_usage}" "${mem_usage}" "${disk_usage}"
+
+  append_log "${pid}" "${cpu_usage}" "${mem_usage}" "${disk_usage}"
+  print_statistics_report
+  print_log_appended
+}
+
+main "$@"
