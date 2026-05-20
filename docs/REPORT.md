@@ -666,12 +666,24 @@ agent-admin@ubuntu:~$
 
 logrotate는 로그 파일이 일정 조건을 만족하면 기존 로그 파일을 이름 바꿔 보관하고, 새 로그 파일을 만들거나 기존 파일을 비워서 이어서 기록한다.
 
+`systemctl status logrotate.timer`을 통해 systemd timer를 통해 확인이 가능하다. (systemd timer는 systemd에서 제공하는 예약 실행 기능으로 쉽게 logrotate를 정해진 주기마다 실행해주는 예약 장치라고 이해하면 된다.)
+
 ### 6.2 설정 파일 생성
 ```
 yejoo031053822@ubuntu:~$ sudo vim /etc/logrotate.d/agent-app-monitor
 ```
 - logrotate 설정 파일을 만들어서 작성하는 명령어이다.
-- `/etc/logrotate.d/`는 logrotate 개별 설정 파일들이 들어가는 디렉토리이다. 여기에 파일을 만들면 logrotate가 실행될 때 해당 설정을 읽는다.
+- `/etc/logrotate.d/`는 logrotate 개별 설정 파일들이 들어가는 디렉토리로ㅡ 서비스별 logrotate 설정 파일을 넣는 디렉토리이다. 여기에 파일을 만들면 logrotate가 실행될 때 해당 설정을 읽는다.
+
+```
+sudo logrotate -d /etc/logrotate.d/agent-app-monitor
+```
+- 실제로 파일을 바꾸지는 않고, 어떤 작업을 할지 미리 보여준다.
+
+```
+sudo logrotate -f /etc/logrotate.d/agent-app-monitor
+```
+- logrotate 강제 실행
 
 ### 6.3 현재 설정 파일 내용
 ```
@@ -692,6 +704,12 @@ yejoo031053822@ubuntu:~$ cat /etc/logrotate.d/agent-app-monitor
 - `notifyempty`: 로그 파일이 비어 있으면 rotate하지 말라는 뜻이다.
 - `copytruncate`: 일반적인 로그 로테이션은 기존 파일 이름을 바꾸고 새 파일을 만든다. 그런데 어떤 프로세스는 이미 열어둔 파일 핸들에 계속 로그를 쓰기도 한다. 그 경우 파일 이름만 바꾸면 프로세스가 새 `monitor.log`가 아니라 예전 파일에 계속 쓸 수 있습니다. 이런 문제를 해결하기 위해 현재 `monitor.log` 내용을 `monitor.log.1`로 복사하고, 기존 `monitor.log` 파일은 그대로 두고 내용만 비우는 방식으로 동작한다. 즉, 파일 자체를 바꾸기보다 내용을 복사한 뒤 원본 파일을 비우는 방식이다. 이러면 `monitor.sh`가 계속 같은 경로에 로그를 기록하더라도 문제가 발생하지 않는다. 이번 스크립트는 실행할 때마다 파일을 새로 열어서 쓰기 때문에 copytruncate가 절대 필수는 아니지만, 로그 관리 설정으로는 안전한 선택이다. (매분 스크립트를 시작해서 실행하고 종료하는 방식이라서 파일에서 나가짐)
 - `create 660 agent-admin agent-core`: 새 로그 파일을 만들 때 권한과 소유자를 지정한다. 다만 현재 설정은 `copytruncate`를 이용해서 기존 파일에 계속 작성하는 방식이라 크게 의미 있는 설정은 아니다.
+
+### 6.4 logrotate 관련 파일 구조
+`/etc/logrotate.conf`: 전체 logrotate 기본 설정 파일
+`/etc/logrotate.d/`: 개별 서비스별 설정 디렉토리
+`/etc/logrotate.d/agent-app-monitor`: 우리가 만든 monitor.log 전용 설정
+`/var/log/agent-app/monitor.log`: 실제 관리 대상 로그 파일
 
 ---
 ## 7. crontab 매분 실행 및 자동 실행 확인
