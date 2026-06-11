@@ -139,7 +139,7 @@
 | Linux Distro | Ubuntu |
 | Version | noble |
 | Architecture | amd64 |
-| Machine Name | ubuntu |
-| Domain | ubuntu.orb.local |
-| IP Address | 192.168.139.16 |
-| Username | yejoo031053822 |
+| Machine Name | 로컬 실습 머신 |
+| Domain | 로컬 도메인 |
+| IP Address | 사설 IP 사용 |
+| Username | 로컬 사용자 계정 |
